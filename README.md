@@ -1,6 +1,6 @@
 # Web Performance with Webpack
 
-Demonstrates common use cases for lazy loading JavaScript with code splitting, removing unused code with tree shaking, and prefetching assets with magic comments.
+Illustrates bundler patterns suitable for code splitting, tree shaking, and prefetching (with magic comments).
 
 ## Credits
 

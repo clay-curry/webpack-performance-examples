@@ -1,37 +1,19 @@
-This example illustrates a very simple case of Code Splitting with `require.ensure`.
+This example combines Code Splitting and Loaders. Make sure you have read the documentation of the examples that show the feature alone.
 
-- `a` and `b` are required normally via CommonJS
-- `c` is made available(,but doesn't get execute) through the `require.ensure` array.
-  - webpack will load it on demand
-- `b` and `d` are required via CommonJs in the `require.ensure` callback
-  - webpack detects that these are in the on-demand-callback and
-  - will load them on demand
-  - webpack's optimizer can optimize `b` away
-    - as it is already available through the parent chunks
-
-You can see that webpack outputs two files/chunks:
-
-- `output.js` is the entry chunk and contains
-  - the module system
-  - chunk loading logic
-  - the entry point `example.js`
-  - module `a`
-  - module `b`
-- `1.output.js` is an additional chunk (on-demand loaded) and contains
-  - module `c`
-  - module `d`
-
-You can see that chunks are loaded via JSONP. The additional chunks are pretty small and minimize well.
+The bundle loader is used to create a wrapper module for `file.js` that loads this module on demand. The wrapper module returns a function that can be called to asynchronously receive the inner module.
 
 # example.js
 
 ```javascript
-var a = require("a");
-var b = require("b");
-require.ensure(["c"], function(require) {
-    require("b").xyz();
-    var d = require("d");
+require("bundle-loader!./file.js")(function(fileJsExports) {
+	console.log(fileJsExports);
 });
+```
+
+# file.js
+
+```javascript
+module.exports = "It works";
 ```
 
 # dist/output.js
@@ -41,25 +23,28 @@ require.ensure(["c"], function(require) {
 /******/ 	var __webpack_modules__ = ([
 /* 0 */,
 /* 1 */
-/*!***************************!*\
-  !*** ./node_modules/a.js ***!
-  \***************************/
+/*!***********************************************************!*\
+  !*** ../../node_modules/bundle-loader/index.js!./file.js ***!
+  \***********************************************************/
 /*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
+/*! runtime requirements: module, __webpack_require__, __webpack_require__.e, __webpack_require__.* */
+/*! CommonJS bailout: module.exports is used directly at 3:0-14 */
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-// module a
-
-/***/ }),
-/* 2 */
-/*!***************************!*\
-  !*** ./node_modules/b.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module b
+var cbs = [], 
+	data;
+module.exports = function(cb) {
+	if(cbs) cbs.push(cb);
+	else cb(data);
+}
+__webpack_require__.e(/*! require.ensure */ 929).then((function(require) {
+	data = __webpack_require__(/*! !!./file.js */ 2);
+	var callbacks = cbs;
+	cbs = null;
+	for(var i = 0, l = callbacks.length; i < l; i++) {
+		callbacks[i](data);
+	}
+}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
 
 /***/ })
 /******/ 	]);
@@ -277,55 +262,36 @@ var __webpack_exports__ = {};
   !*** ./example.js ***!
   \********************/
 /*! unknown exports (runtime-defined) */
-/*! runtime requirements: __webpack_require__, __webpack_require__.e, __webpack_require__.* */
-var a = __webpack_require__(/*! a */ 1);
-var b = __webpack_require__(/*! b */ 2);
-__webpack_require__.e(/*! require.ensure */ 796).then((function(require) {
-    (__webpack_require__(/*! b */ 2).xyz)();
-    var d = __webpack_require__(/*! d */ 4);
-}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
+/*! runtime requirements: __webpack_require__ */
+__webpack_require__(/*! bundle-loader!./file.js */ 1)(function(fileJsExports) {
+	console.log(fileJsExports);
+});
+
 })();
 
 /******/ })()
 ;
 ```
 
-# dist/796.output.js
+# dist/929.output.js
 
 ```javascript
-(self["webpackChunk"] = self["webpackChunk"] || []).push([[796],[
-/* 0 */,
-/* 1 */,
-/* 2 */,
-/* 3 */
-/*!***************************!*\
-  !*** ./node_modules/c.js ***!
-  \***************************/
+(self["webpackChunk"] = self["webpackChunk"] || []).push([[929],{
+
+/***/ 2:
+/*!*****************!*\
+  !*** ./file.js ***!
+  \*****************/
 /*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
+/*! runtime requirements: module */
+/*! CommonJS bailout: module.exports is used directly at 1:0-14 */
+/***/ ((module) => {
 
-// module c
-
-/***/ }),
-/* 4 */
-/*!***************************!*\
-  !*** ./node_modules/d.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module d
+module.exports = "It works";
 
 /***/ })
-]]);
-```
 
-Minimized
-
-```javascript
-(self.webpackChunk=self.webpackChunk||[]).push([[796],{286:()=>{},882:()=>{}}]);
+}]);
 ```
 
 # Info
@@ -333,45 +299,41 @@ Minimized
 ## Unoptimized
 
 ```
-asset output.js 9.47 KiB [emitted] (name: main)
-asset 796.output.js 528 bytes [emitted]
-chunk (runtime: main) output.js (main) 161 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
+asset output.js 9.68 KiB [emitted] (name: main)
+asset 929.output.js 354 bytes [emitted]
+chunk (runtime: main) output.js (main) 375 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
   > ./example.js main
   runtime modules 4.97 KiB 6 modules
-  dependent modules 22 bytes [dependent] 2 modules
-  ./example.js 139 bytes [built] [code generated]
+  dependent modules 281 bytes [dependent] 1 module
+  ./example.js 94 bytes [built] [code generated]
     [used exports unknown]
     entry ./example.js main
-chunk (runtime: main) 796.output.js 22 bytes [rendered]
-  > ./example.js 3:0-6:2
-  ./node_modules/c.js 11 bytes [built] [code generated]
+chunk (runtime: main) 929.output.js 28 bytes [rendered]
+  > ../../node_modules/bundle-loader/index.js!./file.js 7:0-14:2
+  ./file.js 28 bytes [built] [code generated]
     [used exports unknown]
-    require.ensure item c ./example.js 3:0-6:2
-  ./node_modules/d.js 11 bytes [built] [code generated]
-    [used exports unknown]
-    cjs require d ./example.js 5:12-24
+    cjs self exports reference ./file.js 1:0-14
+    cjs require !!./file.js ../../node_modules/bundle-loader/index.js!./file.js 8:8-30
 webpack 5.78.0 compiled successfully
 ```
 
 ## Production mode
 
 ```
-asset output.js 1.74 KiB [emitted] [minimized] (name: main)
-asset 796.output.js 80 bytes [emitted] [minimized]
-chunk (runtime: main) output.js (main) 161 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
+asset output.js 1.85 KiB [emitted] [minimized] (name: main)
+asset 929.output.js 88 bytes [emitted] [minimized]
+chunk (runtime: main) output.js (main) 375 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
   > ./example.js main
   runtime modules 4.97 KiB 6 modules
-  dependent modules 22 bytes [dependent] 2 modules
-  ./example.js 139 bytes [built] [code generated]
+  dependent modules 281 bytes [dependent] 1 module
+  ./example.js 94 bytes [built] [code generated]
     [no exports used]
     entry ./example.js main
-chunk (runtime: main) 796.output.js 22 bytes [rendered]
-  > ./example.js 3:0-6:2
-  ./node_modules/c.js 11 bytes [built] [code generated]
+chunk (runtime: main) 929.output.js 28 bytes [rendered]
+  > ../../node_modules/bundle-loader/index.js!./file.js 7:0-14:2
+  ./file.js 28 bytes [built] [code generated]
     [used exports unknown]
-    require.ensure item c ./example.js 3:0-6:2
-  ./node_modules/d.js 11 bytes [built] [code generated]
-    [used exports unknown]
-    cjs require d ./example.js 5:12-24
+    cjs self exports reference ./file.js 1:0-14
+    cjs require !!./file.js ../../node_modules/bundle-loader/index.js!./file.js 8:8-30
 webpack 5.78.0 compiled successfully
 ```

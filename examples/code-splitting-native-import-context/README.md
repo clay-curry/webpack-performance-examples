@@ -1,37 +1,35 @@
-This example illustrates a very simple case of Code Splitting with `require.ensure`.
-
-- `a` and `b` are required normally via CommonJS
-- `c` is made available(,but doesn't get execute) through the `require.ensure` array.
-  - webpack will load it on demand
-- `b` and `d` are required via CommonJs in the `require.ensure` callback
-  - webpack detects that these are in the on-demand-callback and
-  - will load them on demand
-  - webpack's optimizer can optimize `b` away
-    - as it is already available through the parent chunks
-
-You can see that webpack outputs two files/chunks:
-
-- `output.js` is the entry chunk and contains
-  - the module system
-  - chunk loading logic
-  - the entry point `example.js`
-  - module `a`
-  - module `b`
-- `1.output.js` is an additional chunk (on-demand loaded) and contains
-  - module `c`
-  - module `d`
-
-You can see that chunks are loaded via JSONP. The additional chunks are pretty small and minimize well.
-
 # example.js
 
+This example illustrates how to leverage the `import()` syntax to create ContextModules which are separated into separate chunks for each module in the `./templates` folder.
+
 ```javascript
-var a = require("a");
-var b = require("b");
-require.ensure(["c"], function(require) {
-    require("b").xyz();
-    var d = require("d");
-});
+async function getTemplate(templateName) {
+	try {
+		let template = await import(`./templates/${templateName}`);
+		console.log(template);
+	} catch(err) {
+		console.error("template error");
+		return new Error(err);
+	}
+}
+
+getTemplate("foo");
+getTemplate("bar");
+getTemplate("baz");
+```
+
+# templates/
+
+- foo.js
+- baz.js
+- bar.js
+
+All templates are of this pattern:
+
+```javascript
+var foo = "foo";
+
+export default foo;
 ```
 
 # dist/output.js
@@ -41,25 +39,57 @@ require.ensure(["c"], function(require) {
 /******/ 	var __webpack_modules__ = ([
 /* 0 */,
 /* 1 */
-/*!***************************!*\
-  !*** ./node_modules/a.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
+/*!***************************************************!*\
+  !*** ./templates/ lazy ^\.\/.*$ namespace object ***!
+  \***************************************************/
+/*! default exports */
+/*! exports [not provided] [no usage info] */
+/*! runtime requirements: module, __webpack_require__.o, __webpack_require__, __webpack_require__.e, __webpack_require__.* */
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-// module a
+var map = {
+	"./bar": [
+		2,
+		398
+	],
+	"./bar.js": [
+		2,
+		398
+	],
+	"./baz": [
+		3,
+		544
+	],
+	"./baz.js": [
+		3,
+		544
+	],
+	"./foo": [
+		4,
+		718
+	],
+	"./foo.js": [
+		4,
+		718
+	]
+};
+function webpackAsyncContext(req) {
+	if(!__webpack_require__.o(map, req)) {
+		return Promise.resolve().then(() => {
+			var e = new Error("Cannot find module '" + req + "'");
+			e.code = 'MODULE_NOT_FOUND';
+			throw e;
+		});
+	}
 
-/***/ }),
-/* 2 */
-/*!***************************!*\
-  !*** ./node_modules/b.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module b
+	var ids = map[req], id = ids[0];
+	return __webpack_require__.e(ids[1]).then(() => {
+		return __webpack_require__(id);
+	});
+}
+webpackAsyncContext.keys = () => (Object.keys(map));
+webpackAsyncContext.id = 1;
+module.exports = webpackAsyncContext;
 
 /***/ })
 /******/ 	]);
@@ -97,6 +127,18 @@ require.ensure(["c"], function(require) {
 /******/ 	__webpack_require__.m = __webpack_modules__;
 /******/ 	
 /************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
 /******/ 	/* webpack/runtime/ensure chunk */
 /******/ 	(() => {
 /******/ 		__webpack_require__.f = {};
@@ -166,6 +208,17 @@ require.ensure(["c"], function(require) {
 /******/ 			script.onerror = onScriptComplete.bind(null, script.onerror);
 /******/ 			script.onload = onScriptComplete.bind(null, script.onload);
 /******/ 			needAttach && document.head.appendChild(script);
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -277,55 +330,27 @@ var __webpack_exports__ = {};
   !*** ./example.js ***!
   \********************/
 /*! unknown exports (runtime-defined) */
-/*! runtime requirements: __webpack_require__, __webpack_require__.e, __webpack_require__.* */
-var a = __webpack_require__(/*! a */ 1);
-var b = __webpack_require__(/*! b */ 2);
-__webpack_require__.e(/*! require.ensure */ 796).then((function(require) {
-    (__webpack_require__(/*! b */ 2).xyz)();
-    var d = __webpack_require__(/*! d */ 4);
-}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
+/*! runtime requirements: __webpack_require__ */
+async function getTemplate(templateName) {
+	try {
+		let template = await __webpack_require__(1)(`./${templateName}`);
+		console.log(template);
+	} catch(err) {
+		console.error("template error");
+		return new Error(err);
+	}
+}
+
+getTemplate("foo");
+getTemplate("bar");
+getTemplate("baz");
+
+
+
 })();
 
 /******/ })()
 ;
-```
-
-# dist/796.output.js
-
-```javascript
-(self["webpackChunk"] = self["webpackChunk"] || []).push([[796],[
-/* 0 */,
-/* 1 */,
-/* 2 */,
-/* 3 */
-/*!***************************!*\
-  !*** ./node_modules/c.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module c
-
-/***/ }),
-/* 4 */
-/*!***************************!*\
-  !*** ./node_modules/d.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module d
-
-/***/ })
-]]);
-```
-
-Minimized
-
-```javascript
-(self.webpackChunk=self.webpackChunk||[]).push([[796],{286:()=>{},882:()=>{}}]);
 ```
 
 # Info
@@ -333,45 +358,78 @@ Minimized
 ## Unoptimized
 
 ```
-asset output.js 9.47 KiB [emitted] (name: main)
-asset 796.output.js 528 bytes [emitted]
-chunk (runtime: main) output.js (main) 161 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
+asset output.js 11 KiB [emitted] (name: main)
+asset 398.output.js 858 bytes [emitted]
+asset 544.output.js 858 bytes [emitted]
+asset 718.output.js 858 bytes [emitted]
+chunk (runtime: main) output.js (main) 441 bytes (javascript) 5.54 KiB (runtime) [entry] [rendered]
   > ./example.js main
-  runtime modules 4.97 KiB 6 modules
-  dependent modules 22 bytes [dependent] 2 modules
-  ./example.js 139 bytes [built] [code generated]
+  runtime modules 5.54 KiB 8 modules
+  dependent modules 160 bytes [dependent] 1 module
+  ./example.js 281 bytes [built] [code generated]
     [used exports unknown]
     entry ./example.js main
-chunk (runtime: main) 796.output.js 22 bytes [rendered]
-  > ./example.js 3:0-6:2
-  ./node_modules/c.js 11 bytes [built] [code generated]
+chunk (runtime: main) 398.output.js 38 bytes [rendered]
+  > ./bar ./templates/ lazy ^\.\/.*$ namespace object ./bar
+  > ./bar.js ./templates/ lazy ^\.\/.*$ namespace object ./bar.js
+  ./templates/bar.js 38 bytes [optional] [built] [code generated]
+    [exports: default]
     [used exports unknown]
-    require.ensure item c ./example.js 3:0-6:2
-  ./node_modules/d.js 11 bytes [built] [code generated]
+    import() context element ./bar ./templates/ lazy ^\.\/.*$ namespace object ./bar
+    import() context element ./bar.js ./templates/ lazy ^\.\/.*$ namespace object ./bar.js
+chunk (runtime: main) 544.output.js 38 bytes [rendered]
+  > ./baz ./templates/ lazy ^\.\/.*$ namespace object ./baz
+  > ./baz.js ./templates/ lazy ^\.\/.*$ namespace object ./baz.js
+  ./templates/baz.js 38 bytes [optional] [built] [code generated]
+    [exports: default]
     [used exports unknown]
-    cjs require d ./example.js 5:12-24
+    import() context element ./baz ./templates/ lazy ^\.\/.*$ namespace object ./baz
+    import() context element ./baz.js ./templates/ lazy ^\.\/.*$ namespace object ./baz.js
+chunk (runtime: main) 718.output.js 38 bytes [rendered]
+  > ./foo ./templates/ lazy ^\.\/.*$ namespace object ./foo
+  > ./foo.js ./templates/ lazy ^\.\/.*$ namespace object ./foo.js
+  ./templates/foo.js 38 bytes [optional] [built] [code generated]
+    [exports: default]
+    [used exports unknown]
+    import() context element ./foo ./templates/ lazy ^\.\/.*$ namespace object ./foo
+    import() context element ./foo.js ./templates/ lazy ^\.\/.*$ namespace object ./foo.js
 webpack 5.78.0 compiled successfully
 ```
 
 ## Production mode
 
 ```
-asset output.js 1.74 KiB [emitted] [minimized] (name: main)
-asset 796.output.js 80 bytes [emitted] [minimized]
-chunk (runtime: main) output.js (main) 161 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
+asset output.js 2.43 KiB [emitted] [minimized] (name: main)
+asset 398.output.js 130 bytes [emitted] [minimized]
+asset 544.output.js 130 bytes [emitted] [minimized]
+asset 718.output.js 130 bytes [emitted] [minimized]
+chunk (runtime: main) output.js (main) 441 bytes (javascript) 5.54 KiB (runtime) [entry] [rendered]
   > ./example.js main
-  runtime modules 4.97 KiB 6 modules
-  dependent modules 22 bytes [dependent] 2 modules
-  ./example.js 139 bytes [built] [code generated]
+  runtime modules 5.54 KiB 8 modules
+  dependent modules 160 bytes [dependent] 1 module
+  ./example.js 281 bytes [built] [code generated]
     [no exports used]
     entry ./example.js main
-chunk (runtime: main) 796.output.js 22 bytes [rendered]
-  > ./example.js 3:0-6:2
-  ./node_modules/c.js 11 bytes [built] [code generated]
-    [used exports unknown]
-    require.ensure item c ./example.js 3:0-6:2
-  ./node_modules/d.js 11 bytes [built] [code generated]
-    [used exports unknown]
-    cjs require d ./example.js 5:12-24
+chunk (runtime: main) 398.output.js 38 bytes [rendered]
+  > ./bar ./templates/ lazy ^\.\/.*$ namespace object ./bar
+  > ./bar.js ./templates/ lazy ^\.\/.*$ namespace object ./bar.js
+  ./templates/bar.js 38 bytes [optional] [built] [code generated]
+    [exports: default]
+    import() context element ./bar ./templates/ lazy ^\.\/.*$ namespace object ./bar
+    import() context element ./bar.js ./templates/ lazy ^\.\/.*$ namespace object ./bar.js
+chunk (runtime: main) 544.output.js 38 bytes [rendered]
+  > ./baz ./templates/ lazy ^\.\/.*$ namespace object ./baz
+  > ./baz.js ./templates/ lazy ^\.\/.*$ namespace object ./baz.js
+  ./templates/baz.js 38 bytes [optional] [built] [code generated]
+    [exports: default]
+    import() context element ./baz ./templates/ lazy ^\.\/.*$ namespace object ./baz
+    import() context element ./baz.js ./templates/ lazy ^\.\/.*$ namespace object ./baz.js
+chunk (runtime: main) 718.output.js 38 bytes [rendered]
+  > ./foo ./templates/ lazy ^\.\/.*$ namespace object ./foo
+  > ./foo.js ./templates/ lazy ^\.\/.*$ namespace object ./foo.js
+  ./templates/foo.js 38 bytes [optional] [built] [code generated]
+    [exports: default]
+    import() context element ./foo ./templates/ lazy ^\.\/.*$ namespace object ./foo
+    import() context element ./foo.js ./templates/ lazy ^\.\/.*$ namespace object ./foo.js
 webpack 5.78.0 compiled successfully
 ```

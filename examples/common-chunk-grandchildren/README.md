@@ -1,68 +1,113 @@
-This example illustrates a very simple case of Code Splitting with `require.ensure`.
+This example illustrates how common modules from deep ancestors of an entry point can be split into a separate common chunk
 
-- `a` and `b` are required normally via CommonJS
-- `c` is made available(,but doesn't get execute) through the `require.ensure` array.
-  - webpack will load it on demand
-- `b` and `d` are required via CommonJs in the `require.ensure` callback
-  - webpack detects that these are in the on-demand-callback and
-  - will load them on demand
-  - webpack's optimizer can optimize `b` away
-    - as it is already available through the parent chunks
+- `pageA` and `pageB` are dynamically required
+- `pageC` and `pageA` both require the `reusableComponent`
+- `pageB` dynamically requires `PageC`
 
-You can see that webpack outputs two files/chunks:
+You can see that webpack outputs five files/chunks:
 
 - `output.js` is the entry chunk and contains
   - the module system
   - chunk loading logic
   - the entry point `example.js`
-  - module `a`
-  - module `b`
-- `1.output.js` is an additional chunk (on-demand loaded) and contains
-  - module `c`
-  - module `d`
-
-You can see that chunks are loaded via JSONP. The additional chunks are pretty small and minimize well.
+- `0.output.js` is an additional chunk
+  - module `reusableComponent`
+- `1.output.js` is an additional chunk
+  - module `pageB`
+- `2.output.js` is an additional chunk
+  - module `pageA`
+- `3.output.js` is an additional chunk
+  - module `pageC`
 
 # example.js
 
 ```javascript
-var a = require("a");
-var b = require("b");
-require.ensure(["c"], function(require) {
-    require("b").xyz();
-    var d = require("d");
-});
+var main = function() {
+	console.log("Main class");
+	require.ensure([], () => {
+		const page = require("./pageA");
+		page();
+	});
+	require.ensure([], () => {
+		const page = require("./pageB");
+		page();
+	});
+};
+
+main();
+```
+
+# pageA.js
+
+```javascript
+var reusableComponent = require("./reusableComponent");
+
+module.exports = function() {
+	console.log("Page A");
+	reusableComponent();
+};
+```
+
+# pageB.js
+
+```javascript
+module.exports = function() {
+	console.log("Page B");
+	require.ensure([], ()=>{
+		const page = require("./pageC");
+		page();
+	});
+};
+```
+
+# pageC.js
+
+```javascript
+var reusableComponent = require("./reusableComponent");
+
+module.exports = function() {
+	console.log("Page C");
+	reusableComponent();
+};
+```
+
+# reusableComponent.js
+
+```javascript
+module.exports = function() {
+	console.log("reusable Component");
+};
+```
+
+# webpack.config.js
+
+```javascript
+"use strict";
+const path = require("path");
+
+module.exports = {
+	// mode: "development" || "production",
+	entry: {
+		main: ["./example.js"]
+	},
+	optimization: {
+		splitChunks: {
+			minSize: 0 // This example is too small, in practice you can use the defaults
+		},
+		chunkIds: "deterministic" // To keep filename consistent between different modes (for example building only)
+	},
+	output: {
+		path: path.resolve(__dirname, "dist"),
+		filename: "output.js"
+	}
+};
 ```
 
 # dist/output.js
 
 ```javascript
 /******/ (() => { // webpackBootstrap
-/******/ 	var __webpack_modules__ = ([
-/* 0 */,
-/* 1 */
-/*!***************************!*\
-  !*** ./node_modules/a.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module a
-
-/***/ }),
-/* 2 */
-/*!***************************!*\
-  !*** ./node_modules/b.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
-
-// module b
-
-/***/ })
-/******/ 	]);
+/******/ 	var __webpack_modules__ = ({});
 ```
 
 <details><summary><code>/* webpack runtime code */</code></summary>
@@ -271,61 +316,132 @@ require.ensure(["c"], function(require) {
 
 ``` js
 var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
-(() => {
 /*!********************!*\
   !*** ./example.js ***!
   \********************/
 /*! unknown exports (runtime-defined) */
 /*! runtime requirements: __webpack_require__, __webpack_require__.e, __webpack_require__.* */
-var a = __webpack_require__(/*! a */ 1);
-var b = __webpack_require__(/*! b */ 2);
-__webpack_require__.e(/*! require.ensure */ 796).then((function(require) {
-    (__webpack_require__(/*! b */ 2).xyz)();
-    var d = __webpack_require__(/*! d */ 4);
-}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
-})();
+var main = function() {
+	console.log("Main class");
+	Promise.all(/*! require.ensure */[__webpack_require__.e(421), __webpack_require__.e(366)]).then((() => {
+		const page = __webpack_require__(/*! ./pageA */ 1);
+		page();
+	}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
+	__webpack_require__.e(/*! require.ensure */ 588).then((() => {
+		const page = __webpack_require__(/*! ./pageB */ 3);
+		page();
+	}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
+};
+
+main();
 
 /******/ })()
 ;
 ```
 
-# dist/796.output.js
+# dist/366.output.js
 
 ```javascript
-(self["webpackChunk"] = self["webpackChunk"] || []).push([[796],[
+(self["webpackChunk"] = self["webpackChunk"] || []).push([[366],[
 /* 0 */,
-/* 1 */,
-/* 2 */,
-/* 3 */
-/*!***************************!*\
-  !*** ./node_modules/c.js ***!
-  \***************************/
+/* 1 */
+/*!******************!*\
+  !*** ./pageA.js ***!
+  \******************/
 /*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
+/*! runtime requirements: module, __webpack_require__ */
+/*! CommonJS bailout: module.exports is used directly at 3:0-14 */
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-// module c
+var reusableComponent = __webpack_require__(/*! ./reusableComponent */ 2);
 
-/***/ }),
-/* 4 */
-/*!***************************!*\
-  !*** ./node_modules/d.js ***!
-  \***************************/
-/*! unknown exports (runtime-defined) */
-/*! runtime requirements:  */
-/***/ (() => {
+module.exports = function() {
+	console.log("Page A");
+	reusableComponent();
+};
 
-// module d
 
 /***/ })
 ]]);
 ```
 
-Minimized
+# dist/588.output.js
 
 ```javascript
-(self.webpackChunk=self.webpackChunk||[]).push([[796],{286:()=>{},882:()=>{}}]);
+(self["webpackChunk"] = self["webpackChunk"] || []).push([[588],{
+
+/***/ 3:
+/*!******************!*\
+  !*** ./pageB.js ***!
+  \******************/
+/*! unknown exports (runtime-defined) */
+/*! runtime requirements: module, __webpack_require__, __webpack_require__.e, __webpack_require__.* */
+/*! CommonJS bailout: module.exports is used directly at 1:0-14 */
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+module.exports = function() {
+	console.log("Page B");
+	Promise.all(/*! require.ensure */[__webpack_require__.e(421), __webpack_require__.e(145)]).then((()=>{
+		const page = __webpack_require__(/*! ./pageC */ 4);
+		page();
+	}).bind(null, __webpack_require__))['catch'](__webpack_require__.oe);
+};
+
+
+/***/ })
+
+}]);
+```
+
+# dist/145.output.js
+
+```javascript
+(self["webpackChunk"] = self["webpackChunk"] || []).push([[145],{
+
+/***/ 4:
+/*!******************!*\
+  !*** ./pageC.js ***!
+  \******************/
+/*! unknown exports (runtime-defined) */
+/*! runtime requirements: module, __webpack_require__ */
+/*! CommonJS bailout: module.exports is used directly at 3:0-14 */
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+var reusableComponent = __webpack_require__(/*! ./reusableComponent */ 2);
+
+module.exports = function() {
+	console.log("Page C");
+	reusableComponent();
+};
+
+
+/***/ })
+
+}]);
+```
+
+# dist/421.output.js
+
+```javascript
+(self["webpackChunk"] = self["webpackChunk"] || []).push([[421],{
+
+/***/ 2:
+/*!******************************!*\
+  !*** ./reusableComponent.js ***!
+  \******************************/
+/*! unknown exports (runtime-defined) */
+/*! runtime requirements: module */
+/*! CommonJS bailout: module.exports is used directly at 1:0-14 */
+/***/ ((module) => {
+
+module.exports = function() {
+	console.log("reusable Component");
+};
+
+
+/***/ })
+
+}]);
 ```
 
 # Info
@@ -333,45 +449,85 @@ Minimized
 ## Unoptimized
 
 ```
-asset output.js 9.47 KiB [emitted] (name: main)
-asset 796.output.js 528 bytes [emitted]
-chunk (runtime: main) output.js (main) 161 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
+asset output.js 9.09 KiB [emitted] (name: main)
+asset 588.output.js 739 bytes [emitted]
+asset 366.output.js 558 bytes [emitted]
+asset 145.output.js 552 bytes [emitted]
+asset 421.output.js 434 bytes [emitted]
+chunk (runtime: main) 145.output.js 136 bytes [rendered]
+  > ./pageB.js 3:1-6:3
+  ./pageC.js 136 bytes [built] [code generated]
+    [used exports unknown]
+    cjs require ./pageC ./pageB.js 4:15-33
+    cjs self exports reference ./pageC.js 3:0-14
+chunk (runtime: main) output.js (main) 220 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
   > ./example.js main
   runtime modules 4.97 KiB 6 modules
-  dependent modules 22 bytes [dependent] 2 modules
-  ./example.js 139 bytes [built] [code generated]
+  ./example.js 220 bytes [built] [code generated]
     [used exports unknown]
     entry ./example.js main
-chunk (runtime: main) 796.output.js 22 bytes [rendered]
-  > ./example.js 3:0-6:2
-  ./node_modules/c.js 11 bytes [built] [code generated]
+chunk (runtime: main) 366.output.js 136 bytes [rendered]
+  > ./example.js 3:1-6:3
+  ./pageA.js 136 bytes [built] [code generated]
     [used exports unknown]
-    require.ensure item c ./example.js 3:0-6:2
-  ./node_modules/d.js 11 bytes [built] [code generated]
+    cjs require ./pageA ./example.js 4:15-33
+    cjs self exports reference ./pageA.js 3:0-14
+chunk (runtime: main) 421.output.js 69 bytes [rendered] split chunk (cache group: default)
+  > ./example.js 3:1-6:3
+  > ./pageB.js 3:1-6:3
+  ./reusableComponent.js 69 bytes [built] [code generated]
     [used exports unknown]
-    cjs require d ./example.js 5:12-24
+    cjs require ./reusableComponent ./pageA.js 1:24-54
+    cjs require ./reusableComponent ./pageC.js 1:24-54
+    cjs self exports reference ./reusableComponent.js 1:0-14
+chunk (runtime: main) 588.output.js 133 bytes [rendered]
+  > ./example.js 7:1-10:3
+  ./pageB.js 133 bytes [built] [code generated]
+    [used exports unknown]
+    cjs require ./pageB ./example.js 8:15-33
+    cjs self exports reference ./pageB.js 1:0-14
 webpack 5.78.0 compiled successfully
 ```
 
 ## Production mode
 
 ```
-asset output.js 1.74 KiB [emitted] [minimized] (name: main)
-asset 796.output.js 80 bytes [emitted] [minimized]
-chunk (runtime: main) output.js (main) 161 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
+asset output.js 1.79 KiB [emitted] [minimized] (name: main)
+asset 588.output.js 198 bytes [emitted] [minimized]
+asset 145.output.js 134 bytes [emitted] [minimized]
+asset 366.output.js 134 bytes [emitted] [minimized]
+asset 421.output.js 123 bytes [emitted] [minimized]
+chunk (runtime: main) 145.output.js 136 bytes [rendered]
+  > ./pageB.js 3:1-6:3
+  ./pageC.js 136 bytes [built] [code generated]
+    [used exports unknown]
+    cjs require ./pageC ./pageB.js 4:15-33
+    cjs self exports reference ./pageC.js 3:0-14
+chunk (runtime: main) output.js (main) 220 bytes (javascript) 4.97 KiB (runtime) [entry] [rendered]
   > ./example.js main
   runtime modules 4.97 KiB 6 modules
-  dependent modules 22 bytes [dependent] 2 modules
-  ./example.js 139 bytes [built] [code generated]
+  ./example.js 220 bytes [built] [code generated]
     [no exports used]
     entry ./example.js main
-chunk (runtime: main) 796.output.js 22 bytes [rendered]
-  > ./example.js 3:0-6:2
-  ./node_modules/c.js 11 bytes [built] [code generated]
+chunk (runtime: main) 366.output.js 136 bytes [rendered]
+  > ./example.js 3:1-6:3
+  ./pageA.js 136 bytes [built] [code generated]
     [used exports unknown]
-    require.ensure item c ./example.js 3:0-6:2
-  ./node_modules/d.js 11 bytes [built] [code generated]
+    cjs require ./pageA ./example.js 4:15-33
+    cjs self exports reference ./pageA.js 3:0-14
+chunk (runtime: main) 421.output.js 69 bytes [rendered] split chunk (cache group: default)
+  > ./example.js 3:1-6:3
+  > ./pageB.js 3:1-6:3
+  ./reusableComponent.js 69 bytes [built] [code generated]
     [used exports unknown]
-    cjs require d ./example.js 5:12-24
+    cjs require ./reusableComponent ./pageA.js 1:24-54
+    cjs require ./reusableComponent ./pageC.js 1:24-54
+    cjs self exports reference ./reusableComponent.js 1:0-14
+chunk (runtime: main) 588.output.js 133 bytes [rendered]
+  > ./example.js 7:1-10:3
+  ./pageB.js 133 bytes [built] [code generated]
+    [used exports unknown]
+    cjs require ./pageB ./example.js 8:15-33
+    cjs self exports reference ./pageB.js 1:0-14
 webpack 5.78.0 compiled successfully
 ```
